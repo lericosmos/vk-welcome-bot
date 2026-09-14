@@ -1,0 +1,106 @@
+{
+  "name": "vk-welcome-bot",
+  "version": "1.0.0",
+  "description": "Бот, отправляющий приветственное сообщение новым подписчикам сообщества ВКонтакте",
+  "main": "vk-welcome-bot.js",
+  "scripts": {
+    "start": "node vk-welcome-bot.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "axios": "^1.7.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+
+// Сервер-обработчик Callback API ВКонтакте:
+// при вступлении нового подписчика в сообщество отправляет ему приветственное сообщение.
+//
+// Установка зависимостей:
+//   npm install express axios
+//
+// Запуск:
+//   node vk-welcome-bot.js
+
+const express = require('express');
+const axios = require('axios');
+
+const app = express();
+app.use(express.json());
+
+// ==== Значения берутся из переменных окружения (Railway → Variables) ====
+// Локально можно создать файл .env и подключить пакет dotenv,
+// либо на время теста вписать значения прямо сюда вместо process.env.*
+const CONFIRMATION_STRING = process.env.CONFIRMATION_STRING || 'СТРОКА_ПОДТВЕРЖДЕНИЯ';
+const SECRET_KEY = process.env.SECRET_KEY || '';
+const ACCESS_TOKEN = process.env.ACCESS_TOKEN || 'ТОКЕН_ДОСТУПА_СООБЩЕСТВА';
+const API_VERSION = '5.199';
+const WELCOME_TEXT = 'Привет! 🖤
+Спасибо за подписку на Elation Pole Dance — рады тебе! ✨
+
+Если давно хотелось попробовать что-то новое, у нас есть несколько направлений:
+
+Pole Fit — пилон + физическая нагрузка: элементы, трюки и прокачка тела.
+High Heels — танцы на каблуках, пластика, хореография и уверенная подача.
+Exotic Pole Dance — женственные, более чувственные хореографии и техника у пилона.
+Strip Plastic — партерная пластика, женственные движения и танцевальные связки.
+Stretching — растяжка и гибкость в комфортном темпе.
+Гамак — воздушная растяжка, расслабление и работа с телом.
+Pole Kids — занятия на пилоне для детей.
+
+Куда бы ты хотела записаться?
+
+Напиши название направления — подскажем ближайшее занятие и поможем записаться 💌';
+// ===================================
+
+app.post('/vk-callback', async (req, res) => {
+  const body = req.body;
+
+  // Проверка секретного ключа, если он задан в настройках VK
+  if (SECRET_KEY && body.secret !== SECRET_KEY) {
+    return res.status(200).send('Bad secret');
+  }
+
+  // Подтверждение сервера при первой настройке Callback API
+  if (body.type === 'confirmation') {
+    return res.send(CONFIRMATION_STRING);
+  }
+
+  // VK ждёт ответ "ok" в течение нескольких секунд, иначе повторит запрос —
+  // отвечаем сразу, а сообщение отправляем асинхронно
+  res.send('ok');
+
+  if (body.type === 'group_join') {
+    const userId = body.object.user_id;
+    console.log(`Новый подписчик: ${userId}`);
+    await sendWelcomeMessage(userId);
+  }
+});
+
+async function sendWelcomeMessage(userId) {
+  try {
+    const response = await axios.get('https://api.vk.com/method/messages.send', {
+      params: {
+        user_id: userId,
+        message: WELCOME_TEXT,
+        random_id: Date.now(),
+        access_token: ACCESS_TOKEN,
+        v: API_VERSION,
+      },
+    });
+
+    if (response.data.error) {
+      // Частая причина ошибки 901: пользователь не разрешил сообщения от сообщества
+      console.error('Ошибка VK API:', response.data.error);
+    } else {
+      console.log(`Приветствие отправлено пользователю ${userId}`);
+    }
+  } catch (err) {
+    console.error('Ошибка запроса к VK API:', err.message);
+  }
+}
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Сервер запущен на порту ${PORT}`));
