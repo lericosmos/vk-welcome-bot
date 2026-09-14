@@ -1,0 +1,16 @@
+{
+  "name": "vk-welcome-bot",
+  "version": "1.0.0",
+  "description": "Бот, отправляющий приветственное сообщение новым подписчикам сообщества ВКонтакте",
+  "main": "vk-welcome-bot.js",
+  "scripts": {
+    "start": "node vk-welcome-bot.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "axios": "^1.7.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
